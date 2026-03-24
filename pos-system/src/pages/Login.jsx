@@ -62,7 +62,7 @@ export default function Login() {
         <div className="left">
           <div className="left-content">
             <p className="eyebrow">Restaurant POS System</p>
-            <h1>LuxDine</h1>
+            <h1>LuxeDine</h1>
             <p className="tagline">
               Built for your team to move faster and your business to run smarter.
             </p>
