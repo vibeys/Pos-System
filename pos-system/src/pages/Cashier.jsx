@@ -34,6 +34,7 @@ const money = new Intl.NumberFormat("en-PH", {
   minimumFractionDigits: 2,
 });
 
+// Keeps receipt text safe before it is printed into the receipt window.
 function escapeHtml(text) {
   return String(text)
     .replace(/&/g, "&amp;")
@@ -43,6 +44,7 @@ function escapeHtml(text) {
     .replace(/'/g, "&#39;");
 }
 
+// Turns the stored category value into a friendly label for the UI.
 function getCategoryLabel(category) {
   const value = String(category || "").toLowerCase();
   if (value === "entree") return "Entrée";
@@ -53,6 +55,7 @@ function getCategoryLabel(category) {
   return value || "Item";
 }
 
+// Picks the small menu icon that matches each food category.
 function getIconByCategory(category) {
   switch (String(category || "").toLowerCase()) {
     case "appetizer":
@@ -70,6 +73,7 @@ function getIconByCategory(category) {
   }
 }
 
+// Builds the stock badge text and styling so the menu can show availability clearly.
 function getStockBadge(stock, isAvailable) {
   const safeStock = Number(stock || 0);
 
@@ -84,6 +88,7 @@ function getStockBadge(stock, isAvailable) {
   return { label: `Low Stock (${safeStock})`, className: "low" };
 }
 
+// Builds the printable receipt layout that opens in a new window.
 function buildReceiptHtml(receipt) {
   const itemsHtml = receipt.items
     .map(
@@ -275,6 +280,7 @@ function buildReceiptHtml(receipt) {
   `;
 }
 
+// Opens the print window and sends the formatted receipt to the browser printer.
 function printReceipt(receipt) {
   const printWindow = window.open("", "_blank", "width=420,height=700");
 
@@ -294,6 +300,7 @@ function printReceipt(receipt) {
   };
 }
 
+// Main cashier screen that handles menu loading, cart updates, checkout, and receipt flow.
 export default function Cashier() {
   const navigate = useNavigate();
   const menuScrollRef = useRef(null);
@@ -307,11 +314,29 @@ export default function Cashier() {
   const [savingOrder, setSavingOrder] = useState(false);
   const [lastReceipt, setLastReceipt] = useState(null);
   const [cashReceived, setCashReceived] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [recentlyAddedId, setRecentlyAddedId] = useState(null);
+  const successTimerRef = useRef(null);
+  const addPulseTimerRef = useRef(null);
 
+  // Loads the menu once when the cashier page opens.
   useEffect(() => {
     fetchMenu();
   }, []);
 
+  // Clears animation timers so nothing keeps running after the page is closed.
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+      if (addPulseTimerRef.current) {
+        clearTimeout(addPulseTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Pulls the latest menu items from the database and keeps the menu cards fresh.
   const fetchMenu = async () => {
     try {
       setLoadingMenu(true);
@@ -365,6 +390,7 @@ export default function Cashier() {
   const cashReceivedNumber = Number(cashReceived) || 0;
   const change = Math.max(0, cashReceivedNumber - total);
 
+  // Updates the stock count in Supabase so the cart and menu stay in sync.
   const syncStockChange = async (itemId, delta) => {
     const currentItem = menu.find((item) => item.id === itemId);
     const currentStock = Number(currentItem?.stock || 0);
@@ -393,6 +419,7 @@ export default function Cashier() {
     return true;
   };
 
+  // Adds an item to the cart right away, then syncs stock in the background for a snappier feel.
   const addToCart = async (item) => {
     const stock = Number(item.stock || 0);
     const alreadyInCart = cart.find((x) => x.id === item.id)?.qty || 0;
@@ -400,25 +427,43 @@ export default function Cashier() {
     if (item.is_available === false || stock <= 0) return;
     if (alreadyInCart >= stock) return;
 
+    setCart((prev) => {
+      const existing = prev.find((x) => x.id === item.id);
+      if (existing) {
+        return prev.map((x) =>
+          x.id === item.id ? { ...x, qty: x.qty + 1 } : x
+        );
+      }
+      return [...prev, { ...item, qty: 1 }];
+    });
+
+    if (addPulseTimerRef.current) {
+      clearTimeout(addPulseTimerRef.current);
+    }
+    setRecentlyAddedId(item.id);
+    addPulseTimerRef.current = setTimeout(() => {
+      setRecentlyAddedId(null);
+    }, 650);
+
     try {
       const reserved = await syncStockChange(item.id, -1);
       if (!reserved) return;
-
-      setCart((prev) => {
-        const existing = prev.find((x) => x.id === item.id);
-        if (existing) {
-          return prev.map((x) =>
-            x.id === item.id ? { ...x, qty: x.qty + 1 } : x
-          );
-        }
-        return [...prev, { ...item, qty: 1 }];
-      });
     } catch (error) {
       console.error("Add to cart stock update failed:", error);
+
+      setCart((prev) =>
+        prev
+          .map((x) =>
+            x.id === item.id ? { ...x, qty: x.qty - 1 } : x
+          )
+          .filter((x) => x.qty > 0)
+      );
+
       alert("Unable to add item. Please try again.");
     }
   };
 
+  // Increases the quantity for one cart item and also reserves one more stock from the menu.
   const increaseQty = async (id) => {
     const stockItem = menu.find((m) => m.id === id);
     const stock = Number(stockItem?.stock || 0);
@@ -441,6 +486,7 @@ export default function Cashier() {
     }
   };
 
+  // Decreases the quantity for one cart item and gives the stock back to the menu.
   const decreaseQty = async (id) => {
     const cartItem = cart.find((item) => item.id === id);
     if (!cartItem) return;
@@ -461,6 +507,7 @@ export default function Cashier() {
     }
   };
 
+  // Removes a cart item completely and restores its reserved stock.
   const removeItem = async (id) => {
     const cartItem = cart.find((item) => item.id === id);
     if (!cartItem) return;
@@ -475,6 +522,7 @@ export default function Cashier() {
     }
   };
 
+  // Empties the cart and optionally returns all reserved stock back to the menu.
   const clearCart = async (restoreStock = true) => {
     try {
       if (restoreStock && cart.length > 0) {
@@ -493,6 +541,7 @@ export default function Cashier() {
 
   const [exiting, setExiting] = useState(false);
 
+  // Plays the logout transition before sending the cashier back to the login screen.
   const handleLogout = () => {
     setExiting(true);
 
@@ -501,6 +550,7 @@ export default function Cashier() {
     }, 650);
   };
 
+  // Saves the order, prints the receipt, and shows the success animation for a short moment.
   const handleCheckout = async () => {
     if (cart.length === 0 || savingOrder || cashReceivedNumber < total) return;
 
@@ -565,8 +615,17 @@ export default function Cashier() {
       setCashReceived("");
       await fetchMenu();
 
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
+
+      // Shows the success card briefly so the cashier gets a gentle confirmation.
+      setShowSuccess(true);
+      successTimerRef.current = setTimeout(() => {
+        setShowSuccess(false);
+      }, 3000);
+
       printReceipt(receipt);
-      alert("Payment completed successfully.");
     } catch (error) {
       console.error("Checkout error:", error);
       alert("Checkout failed. Restoring stock and clearing the cart.");
@@ -584,6 +643,18 @@ export default function Cashier() {
 
   return (
     <div className="page">
+      {showSuccess && (
+        <div className="success-overlay" aria-live="polite" aria-atomic="true">
+          <div className="success-card">
+            <div className="success-icon">
+              <Sparkles size={30} />
+            </div>
+            <h3>Order completed</h3>
+            <p>The receipt is ready and the transaction has been saved.</p>
+          </div>
+        </div>
+      )}
+
       {exiting && (
         <div className="auth-overlay logout">
           <div className="auth-card">
@@ -718,7 +789,7 @@ export default function Cashier() {
                       return (
                         <article
                           key={item.id}
-                          className={`menu-card ${isOutOfStock ? "disabled" : ""}`}
+                          className={`menu-card ${isOutOfStock ? "disabled" : ""} ${recentlyAddedId === item.id ? "adding" : ""}`}
                         >
                           <div className="menu-icon">
                             <Icon size={18} />
@@ -773,7 +844,7 @@ export default function Cashier() {
                     const stock = Number(stockItem?.stock || 0);
 
                     return (
-                      <div key={item.id} className="order-item">
+                      <div key={item.id} className={`order-item ${recentlyAddedId === item.id ? "adding" : ""}`}>
                         <div className="order-item-left">
                           <h4>{item.name}</h4>
                           <p>{money.format(Number(item.price || 0))} each</p>
@@ -1207,6 +1278,11 @@ export default function Cashier() {
           gap: 12px;
         }
 
+        /* Soft add animation design:
+           - quick warm glow
+           - tiny lift
+           - calm fade back to normal
+           It makes the cart feel responsive without looking loud. */
         .menu-card {
           border: 1px solid var(--line);
           background: #fff;
@@ -1225,8 +1301,27 @@ export default function Cashier() {
           border-color: rgba(139, 107, 63, 0.24);
         }
 
+        .menu-card.adding,
+        .order-item.adding {
+          animation: softAddPulse 0.65s ease;
+          border-color: rgba(139, 107, 63, 0.32);
+          box-shadow: 0 16px 34px rgba(139, 107, 63, 0.10);
+        }
+
         .menu-card.disabled {
           opacity: 0.65;
+        }
+
+        @keyframes softAddPulse {
+          0% {
+            transform: scale(1);
+          }
+          35% {
+            transform: scale(1.01);
+          }
+          100% {
+            transform: scale(1);
+          }
         }
 
         .menu-icon {
@@ -1329,13 +1424,38 @@ export default function Cashier() {
           opacity: 0.55;
         }
 
+        /* Cart scroll design:
+           - keeps the current order box from growing too tall
+           - shows only a few items at once
+           - lets the cashier scroll when the cart gets long */
         .order-list {
           display: flex;
           flex-direction: column;
           gap: 12px;
-          max-height: 480px;
-          overflow: auto;
-          padding-right: 2px;
+          max-height: 360px;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding-right: 4px;
+          scroll-behavior: smooth;
+          scrollbar-gutter: stable;
+        }
+
+        .order-list::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .order-list::-webkit-scrollbar-track {
+          background: rgba(139, 107, 63, 0.08);
+          border-radius: 999px;
+        }
+
+        .order-list::-webkit-scrollbar-thumb {
+          background: rgba(139, 107, 63, 0.28);
+          border-radius: 999px;
+        }
+
+        .order-list::-webkit-scrollbar-thumb:hover {
+          background: rgba(139, 107, 63, 0.42);
         }
 
         .empty-state {
@@ -1525,6 +1645,77 @@ export default function Cashier() {
           line-height: 1.5;
         }
 
+        /* Soft success animation design:
+           - gentle blur background
+           - warm card pop
+           - tiny floating sparkle feel
+           The goal is to feel elegant, not flashy. */
+        .success-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: grid;
+          place-items: center;
+          background: rgba(245, 242, 238, 0.55);
+          backdrop-filter: blur(9px);
+          animation: successOverlayIn 0.25s ease both;
+        }
+
+        .success-card {
+          width: min(320px, calc(100vw - 32px));
+          padding: 28px 24px 24px;
+          border-radius: 24px;
+          text-align: center;
+          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,247,242,0.98));
+          border: 1px solid rgba(139, 107, 63, 0.16);
+          box-shadow: 0 22px 54px rgba(20, 20, 20, 0.14);
+          transform-origin: center;
+          animation: successCardPop 0.45s cubic-bezier(.2,.9,.2,1) both;
+        }
+
+        .success-icon {
+          width: 66px;
+          height: 66px;
+          margin: 0 auto 14px;
+          border-radius: 20px;
+          display: grid;
+          place-items: center;
+          color: var(--accent-dark);
+          background: linear-gradient(135deg, rgba(139,107,63,0.12), rgba(111,83,45,0.08));
+          border: 1px solid rgba(139,107,63,0.14);
+          animation: successGlow 1.4s ease-in-out infinite;
+        }
+
+        .success-card h3 {
+          font-size: 22px;
+          color: var(--text);
+          margin-bottom: 8px;
+        }
+
+        .success-card p {
+          color: var(--muted);
+          line-height: 1.5;
+        }
+
+        @keyframes successOverlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes successCardPop {
+          from { opacity: 0; transform: scale(0.94) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes successGlow {
+          0%, 100% { transform: translateY(0); box-shadow: 0 0 0 rgba(139,107,63,0); }
+          50% { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(139,107,63,0.10); }
+        }
+
+        /* Logout animation design:
+           - slightly darker blur
+           - a calm centered card
+           - bouncing dots to show the logout is in progress */
         .auth-overlay {
           position: fixed;
           inset: 0;
@@ -1590,6 +1781,7 @@ export default function Cashier() {
         .auth-dots span:nth-child(2) { animation-delay: 0.12s; }
         .auth-dots span:nth-child(3) { animation-delay: 0.24s; }
 
+        /* Tiny motion details keep the page feeling polished without distracting the cashier. */
         @keyframes overlayIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -1672,6 +1864,10 @@ export default function Cashier() {
 
           .order-item {
             grid-template-columns: 1fr;
+          }
+
+          .order-list {
+            max-height: 320px;
           }
 
           .qty-controls {

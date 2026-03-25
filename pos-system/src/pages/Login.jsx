@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Eye, EyeOff, Shield, Lock, Sparkles, CheckCircle2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Shield,
+  Lock,
+  Sparkles,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
@@ -10,15 +18,19 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [transitionText, setTransitionText] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [showLoginError, setShowLoginError] = useState(false);
 
   const navigate = useNavigate();
 
+  // This runs when the user presses the login button.
   const handleLogin = async (e) => {
     e.preventDefault();
 
     const cleanUsername = username.trim();
     const cleanPassword = password.trim();
 
+    // Make sure both fields are filled in before checking the database.
     if (!cleanUsername || !cleanPassword) {
       alert("Please enter your username and password.");
       return;
@@ -34,13 +46,25 @@ export default function Login() {
         .eq("password", cleanPassword)
         .maybeSingle();
 
+      // If the login details do not match, we show a gentle in-page error instead of an alert.
       if (error || !data) {
-        alert("Invalid username or password.");
+        // When the login is wrong, we show a soft visual cue here instead of a popup.
+        // It stays calm and matches the warm look of the page.
+        setLoginError("Invalid username or password.");
+        setShowLoginError(true);
+
+        setTimeout(() => {
+          setShowLoginError(false);
+          setLoginError("");
+        }, 1400);
+
         return;
       }
 
+      // We normalize the role so it is easy to compare no matter how it is stored.
       const role = String(data.role || "").toLowerCase();
 
+      // Send the user to the correct dashboard based on their role.
       const goToRole = () => {
         if (role === "cashier") {
           navigate("/cashier", { replace: true });
@@ -53,6 +77,7 @@ export default function Login() {
         }
       };
 
+      // This overlay gives a soft “signing in” moment before the redirect happens.
       setTransitionText(`Welcome, ${data.username || cleanUsername}!`);
       setTransitioning(true);
 
@@ -75,7 +100,7 @@ export default function Login() {
             <div className="spark spark-1"><Sparkles size={18} /></div>
             <div className="spark spark-2"><Sparkles size={14} /></div>
             <div className="pulse-ring" />
-            <div className="auth-icon">
+            <div className="auth-icon success-icon">
               <CheckCircle2 size={34} />
             </div>
             <h3>Signing you in...</h3>
@@ -88,7 +113,23 @@ export default function Login() {
           </div>
         </div>
       )}
-      <div className="card">
+
+      {/* Soft login error overlay shown when the password is wrong. */}
+      {showLoginError && (
+        <div className="auth-overlay error-overlay">
+          <div className="auth-card error-card">
+            <div className="error-icon">
+              <AlertCircle size={34} />
+            </div>
+            <h3>Login didn’t work</h3>
+            <p>{loginError}</p>
+            <div className="error-bar" />
+          </div>
+        </div>
+      )}
+
+      {/* Main login card. The class below adds a light nudge when login fails. */}
+      <div className={`card ${showLoginError ? "card-soft-error" : ""}`}>
         <div className="left">
           <div className="left-content">
             <p className="eyebrow">Restaurant POS System</p>
@@ -172,6 +213,9 @@ export default function Login() {
           --accent: #8b6b3f;
           --accent-dark: #6f532d;
           --soft: #faf7f2;
+          --danger: #b42318;
+          --danger-soft: #fef3f2;
+          --danger-line: rgba(180, 35, 24, 0.18);
         }
 
         .page {
@@ -203,6 +247,11 @@ export default function Login() {
         .card:hover {
           transform: translateY(-4px);
           box-shadow: 0 36px 90px rgba(20, 20, 20, 0.18);
+        }
+
+        /* Gentle movement that fits the warm theme instead of a harsh shake. */
+        .card-soft-error {
+          animation: cardSoftNudge 0.75s cubic-bezier(.22,.85,.28,1) both;
         }
 
         .left {
@@ -427,6 +476,7 @@ export default function Login() {
           color: #8a837b;
         }
 
+        /* Full-screen overlay used for success and error feedback. */
         .auth-overlay {
           position: fixed;
           inset: 0;
@@ -438,6 +488,11 @@ export default function Login() {
           animation: overlayIn 0.25s ease both;
         }
 
+        .error-overlay {
+          background: rgba(139, 107, 63, 0.12);
+        }
+
+        /* Small popup card that keeps the feedback calm and polished. */
         .auth-card {
           position: relative;
           width: min(360px, calc(100vw - 32px));
@@ -451,7 +506,29 @@ export default function Login() {
           animation: cardPop 0.5s cubic-bezier(.2,.9,.2,1) both;
         }
 
+        .error-card {
+          border-color: rgba(139, 107, 63, 0.18);
+          background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,247,242,0.98));
+          animation: cardPop 0.5s cubic-bezier(.2,.9,.2,1) both, errorGlow 1.1s ease-out 1;
+        }
+
         .auth-icon {
+          width: 66px;
+          height: 66px;
+          margin: 0 auto 14px;
+          border-radius: 20px;
+          display: grid;
+          place-items: center;
+          color: var(--accent-dark);
+          background: linear-gradient(135deg, rgba(139,107,63,0.12), rgba(111,83,45,0.08));
+          border: 1px solid rgba(139,107,63,0.14);
+        }
+
+        .success-icon {
+          color: var(--accent-dark);
+        }
+
+        .error-icon {
           width: 66px;
           height: 66px;
           margin: 0 auto 14px;
@@ -491,6 +568,16 @@ export default function Login() {
 
         .auth-dots span:nth-child(2) { animation-delay: 0.12s; }
         .auth-dots span:nth-child(3) { animation-delay: 0.24s; }
+
+        /* Small accent bar that gives the error state a subtle animated feel. */
+        .error-bar {
+          width: 72px;
+          height: 4px;
+          margin: 18px auto 0;
+          border-radius: 999px;
+          background: linear-gradient(90deg, rgba(139,107,63,0.18), var(--accent), rgba(139,107,63,0.18));
+          animation: errorPulse 1.2s ease-in-out infinite;
+        }
 
         .spark {
           position: absolute;
@@ -534,6 +621,26 @@ export default function Login() {
           0% { transform: scale(1); opacity: 0.28; }
           70% { transform: scale(1.05); opacity: 0; }
           100% { transform: scale(1.05); opacity: 0; }
+        }
+
+        @keyframes cardSoftNudge {
+          0% { transform: translateX(0) scale(1); }
+          20% { transform: translateX(-4px) scale(0.999); }
+          40% { transform: translateX(4px) scale(0.999); }
+          60% { transform: translateX(-2px) scale(0.999); }
+          80% { transform: translateX(2px) scale(0.999); }
+          100% { transform: translateX(0) scale(1); }
+        }
+
+        @keyframes errorGlow {
+          0% { box-shadow: 0 24px 60px rgba(20, 20, 20, 0.18), 0 0 0 0 rgba(139, 107, 63, 0.18); }
+          50% { box-shadow: 0 24px 60px rgba(20, 20, 20, 0.18), 0 0 0 10px rgba(139, 107, 63, 0); }
+          100% { box-shadow: 0 24px 60px rgba(20, 20, 20, 0.18), 0 0 0 0 rgba(139, 107, 63, 0); }
+        }
+
+        @keyframes errorPulse {
+          0%, 100% { transform: scaleX(1); opacity: 0.55; }
+          50% { transform: scaleX(1.08); opacity: 0.95; }
         }
 
         @media (max-width: 900px) {
