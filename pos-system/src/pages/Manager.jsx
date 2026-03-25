@@ -570,7 +570,7 @@ export default function Manager() {
                   <input
                     value={searchReceipt}
                     onChange={(e) => setSearchReceipt(e.target.value)}
-                    placeholder="Search receipt, status, cashier..."
+                    placeholder="Search receipt ID..."
                   />
                 </div>
               </div>
