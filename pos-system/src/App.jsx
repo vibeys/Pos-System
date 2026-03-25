@@ -7,6 +7,7 @@ import Owner from "./pages/Owner";
 export default function App() {
   return (
     <Routes>
+         {/* routes for pages  */}
       <Route path="/" element={<Login />} />
       <Route path="/cashier" element={<Cashier />} />
       <Route path="/manager" element={<Manager />} />

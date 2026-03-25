@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Shield, Lock } from "lucide-react";
+import { Eye, EyeOff, Shield, Lock, Sparkles, CheckCircle2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabaseClient";
 
@@ -8,6 +8,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionText, setTransitionText] = useState("");
 
   const navigate = useNavigate();
 
@@ -39,15 +41,24 @@ export default function Login() {
 
       const role = String(data.role || "").toLowerCase();
 
-      if (role === "cashier") {
-        navigate("/cashier", { replace: true });
-      } else if (role === "manager") {
-        navigate("/manager", { replace: true });
-      } else if (role === "owner") {
-        navigate("/owner", { replace: true });
-      } else {
-        alert("Role not recognized.");
-      }
+      const goToRole = () => {
+        if (role === "cashier") {
+          navigate("/cashier", { replace: true });
+        } else if (role === "manager") {
+          navigate("/manager", { replace: true });
+        } else if (role === "owner") {
+          navigate("/owner", { replace: true });
+        } else {
+          alert("Role not recognized.");
+        }
+      };
+
+      setTransitionText(`Welcome, ${data.username || cleanUsername}!`);
+      setTransitioning(true);
+
+      setTimeout(() => {
+        goToRole();
+      }, 850);
     } catch (err) {
       console.error(err);
       alert("Login failed.");
@@ -58,6 +69,25 @@ export default function Login() {
 
   return (
     <div className="page">
+      {transitioning && (
+        <div className="auth-overlay">
+          <div className="auth-card">
+            <div className="spark spark-1"><Sparkles size={18} /></div>
+            <div className="spark spark-2"><Sparkles size={14} /></div>
+            <div className="pulse-ring" />
+            <div className="auth-icon">
+              <CheckCircle2 size={34} />
+            </div>
+            <h3>Signing you in...</h3>
+            <p>{transitionText}</p>
+            <div className="auth-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="card">
         <div className="left">
           <div className="left-content">
@@ -395,6 +425,115 @@ export default function Login() {
           text-align: center;
           font-size: 13px;
           color: #8a837b;
+        }
+
+        .auth-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: grid;
+          place-items: center;
+          background: rgba(20, 20, 20, 0.22);
+          backdrop-filter: blur(10px);
+          animation: overlayIn 0.25s ease both;
+        }
+
+        .auth-card {
+          position: relative;
+          width: min(360px, calc(100vw - 32px));
+          padding: 28px 24px 22px;
+          border-radius: 24px;
+          background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,247,242,0.96));
+          border: 1px solid rgba(139, 107, 63, 0.18);
+          box-shadow: 0 24px 60px rgba(20, 20, 20, 0.18);
+          text-align: center;
+          transform-origin: center;
+          animation: cardPop 0.5s cubic-bezier(.2,.9,.2,1) both;
+        }
+
+        .auth-icon {
+          width: 66px;
+          height: 66px;
+          margin: 0 auto 14px;
+          border-radius: 20px;
+          display: grid;
+          place-items: center;
+          color: var(--accent-dark);
+          background: linear-gradient(135deg, rgba(139,107,63,0.12), rgba(111,83,45,0.08));
+          border: 1px solid rgba(139,107,63,0.14);
+        }
+
+        .auth-card h3 {
+          font-size: 22px;
+          color: var(--text);
+          margin-bottom: 8px;
+        }
+
+        .auth-card p {
+          color: var(--muted);
+          line-height: 1.5;
+        }
+
+        .auth-dots {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .auth-dots span {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--accent);
+          animation: dotBounce 0.9s infinite ease-in-out;
+        }
+
+        .auth-dots span:nth-child(2) { animation-delay: 0.12s; }
+        .auth-dots span:nth-child(3) { animation-delay: 0.24s; }
+
+        .spark {
+          position: absolute;
+          color: rgba(139, 107, 63, 0.85);
+          animation: floatSpark 2.2s ease-in-out infinite;
+        }
+
+        .spark-1 { top: 14px; right: 18px; }
+        .spark-2 { left: 18px; top: 22px; animation-delay: 0.4s; }
+
+        .pulse-ring {
+          position: absolute;
+          inset: 18px;
+          border-radius: 22px;
+          border: 1px solid rgba(139, 107, 63, 0.12);
+          animation: ringPulse 1.6s ease-in-out infinite;
+          pointer-events: none;
+        }
+
+        @keyframes overlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes cardPop {
+          from { opacity: 0; transform: scale(0.88) translateY(18px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+          40% { transform: translateY(-7px); opacity: 1; }
+        }
+
+        @keyframes floatSpark {
+          0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.7; }
+          50% { transform: translateY(-6px) rotate(10deg); opacity: 1; }
+        }
+
+        @keyframes ringPulse {
+          0% { transform: scale(1); opacity: 0.28; }
+          70% { transform: scale(1.05); opacity: 0; }
+          100% { transform: scale(1.05); opacity: 0; }
         }
 
         @media (max-width: 900px) {

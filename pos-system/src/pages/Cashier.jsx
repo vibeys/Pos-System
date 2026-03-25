@@ -491,8 +491,14 @@ export default function Cashier() {
     }
   };
 
+  const [exiting, setExiting] = useState(false);
+
   const handleLogout = () => {
-    navigate("/", { replace: true });
+    setExiting(true);
+
+    setTimeout(() => {
+      navigate("/", { replace: true });
+    }, 650);
   };
 
   const handleCheckout = async () => {
@@ -578,6 +584,23 @@ export default function Cashier() {
 
   return (
     <div className="page">
+      {exiting && (
+        <div className="auth-overlay logout">
+          <div className="auth-card">
+            <div className="auth-icon">
+              <LogOut size={34} />
+            </div>
+            <h3>Logging out...</h3>
+            <p>Wrapping up your session nicely.</p>
+            <div className="auth-dots">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <aside className="left">
           <div className="left-content">
@@ -1500,6 +1523,86 @@ export default function Cashier() {
           color: var(--muted);
           font-size: 13px;
           line-height: 1.5;
+        }
+
+        .auth-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          display: grid;
+          place-items: center;
+          background: rgba(20, 20, 20, 0.22);
+          backdrop-filter: blur(10px);
+          animation: overlayIn 0.25s ease both;
+        }
+
+        .auth-card {
+          position: relative;
+          width: min(360px, calc(100vw - 32px));
+          padding: 28px 24px 22px;
+          border-radius: 24px;
+          background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(250,247,242,0.96));
+          border: 1px solid rgba(139, 107, 63, 0.18);
+          box-shadow: 0 24px 60px rgba(20, 20, 20, 0.18);
+          text-align: center;
+          transform-origin: center;
+          animation: cardPop 0.5s cubic-bezier(.2,.9,.2,1) both;
+        }
+
+        .auth-icon {
+          width: 66px;
+          height: 66px;
+          margin: 0 auto 14px;
+          border-radius: 20px;
+          display: grid;
+          place-items: center;
+          color: var(--accent-dark);
+          background: linear-gradient(135deg, rgba(139,107,63,0.12), rgba(111,83,45,0.08));
+          border: 1px solid rgba(139,107,63,0.14);
+        }
+
+        .auth-card h3 {
+          font-size: 22px;
+          color: var(--text);
+          margin-bottom: 8px;
+        }
+
+        .auth-card p {
+          color: var(--muted);
+          line-height: 1.5;
+        }
+
+        .auth-dots {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 18px;
+        }
+
+        .auth-dots span {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: var(--accent);
+          animation: dotBounce 0.9s infinite ease-in-out;
+        }
+
+        .auth-dots span:nth-child(2) { animation-delay: 0.12s; }
+        .auth-dots span:nth-child(3) { animation-delay: 0.24s; }
+
+        @keyframes overlayIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes cardPop {
+          from { opacity: 0; transform: scale(0.88) translateY(18px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        @keyframes dotBounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+          40% { transform: translateY(-7px); opacity: 1; }
         }
 
         @media (max-width: 1280px) {
