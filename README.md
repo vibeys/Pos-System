@@ -8,3 +8,6 @@ Pass: manager123
 
 User: owner1
 Pass: ownder123
+
+
+ ps: since im using supabase it might error due to paused database 
