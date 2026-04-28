@@ -300,7 +300,7 @@ function printReceipt(receipt) {
   };
 }
 
-// Main cashier screen that handles menu loading, cart updates, checkout, and receipt flow.
+// Main cashier screen that handles menu loadings, cart updates, checkout, and receipt flow.
 export default function Cashier() {
   const navigate = useNavigate();
   const menuScrollRef = useRef(null);
