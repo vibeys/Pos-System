@@ -285,7 +285,7 @@ function printReceipt(receipt) {
   const printWindow = window.open("", "_blank", "width=420,height=700");
 
   if (!printWindow) {
-    alert("Popup blocked. Please allow popups to print the receipt.");
+    alert("Popup blocked. Please allow popups to print the receipt...");
     return;
   }
 
@@ -293,7 +293,7 @@ function printReceipt(receipt) {
   printWindow.document.write(buildReceiptHtml(receipt));
   printWindow.document.close();
 
-  printWindow.onload = () => {
+  printWindow.onload = () => {``
     printWindow.focus();
     printWindow.print();
     printWindow.close();
